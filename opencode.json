@@ -1,6 +1,7 @@
 {
   "instructions": [
     "AGENTS.md",
-    "DOCKER.md"
+    "DOCKER.md",
+    "GUIDE.md"
   ]
 }
