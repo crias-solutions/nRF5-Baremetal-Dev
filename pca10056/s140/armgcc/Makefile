@@ -269,9 +269,11 @@ default: nrf52840_xxaa
 help:
 	@echo following targets are available:
 	@echo		nrf52840_xxaa
-	@echo		flash_softdevice
-	@echo		sdk_config - starting external tool for editing sdk_config.h
-	@echo		flash      - flashing binary
+	@echo		check_device  - validate J-Link and device before flashing
+	@echo		flash        - build and flash with validation
+	@echo		flash_softdevice - flash S140 softdevice with validation
+	@echo		erase        - erase device with validation
+	@echo		sdk_config   - launch SDK configuration wizard
 
 TEMPLATE_PATH := $(SDK_ROOT)/components/toolchain/gcc
 
@@ -280,22 +282,83 @@ include $(TEMPLATE_PATH)/Makefile.common
 
 $(foreach target, $(TARGETS), $(call define_target, $(target)))
 
-.PHONY: flash flash_softdevice erase
+.PHONY: flash flash_softdevice erase check_device
 
-# Flash the program
-flash: default
+# ============================================================================
+# Pre-flash Device Validation
+# ============================================================================
+
+check_device:
+	@echo ============================================
+	@echo Pre-flash Device Validation
+	@echo ============================================
+	@echo [1/3] Checking J-Link connectivity...
+	@nrfjprog -f nrf52 --ids 2>&1; \
+	  if [ $$? -ne 0 ]; then \
+	    echo ""; \
+	    echo "============================================"; \
+	    echo "VALIDATION FAILED: No J-Link device found!"; \
+	    echo "============================================"; \
+	    echo "Troubleshooting:"; \
+	    echo "  1. Verify board is connected via USB"; \
+	    echo "  2. Check J-Link drivers are installed"; \
+	    echo "  3. Try unplugging and replugging the board"; \
+	    echo "============================================"; \
+	    exit 1; \
+	  fi
+	@echo J-Link detected.
+	@echo [2/3] Checking device family...
+	@DEVICE_ID=$$(nrfjprog -f nrf52 --ids 2>&1 | grep -E '^[0-9]+$$' | head -1); \
+	  if [ -z "$$DEVICE_ID" ]; then \
+	    echo "ERROR: Could not read device ID"; \
+	    exit 1; \
+	  fi; \
+	  nrfjprog -f nrf52 --snr $$DEVICE_ID --deviceversion 2>&1 | tee /tmp/device_info.txt; \
+	  if grep -qi "nRF52840" /tmp/device_info.txt; then \
+	    echo "[OK] Device verified: nRF52840"; \
+	  else \
+	    echo ""; \
+	    echo "============================================"; \
+	    echo "VALIDATION FAILED: Wrong device!"; \
+	    echo "Expected: nRF52840_XXAA"; \
+	    echo "============================================"; \
+	    rm -f /tmp/device_info.txt 2>/dev/null; \
+	    exit 1; \
+	  fi
+	@rm -f /tmp/device_info.txt 2>/dev/null
+	@echo [3/3] Checking COM ports...
+	@powershell -ExecutionPolicy Bypass -File "$(PROJ_DIR)/pca10056/s140/armgcc/check_com_ports.ps1"
+	@echo ============================================
+	@echo Device validation PASSED.
+	@echo ============================================
+
+# Flash the program (requires validation)
+flash: check_device default
+	@echo ============================================
 	@echo Flashing: $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex
 	nrfjprog -f nrf52 --program $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex --sectorerase
 	nrfjprog -f nrf52 --reset
+	@echo ============================================
+	@echo Flash complete.
+	@echo ============================================
 
 # Flash softdevice
-flash_softdevice:
+flash_softdevice: check_device
+	@echo ============================================
 	@echo Flashing: s140_nrf52_7.2.0_softdevice.hex
 	nrfjprog -f nrf52 --program $(SDK_ROOT)/components/softdevice/s140/hex/s140_nrf52_7.2.0_softdevice.hex --sectorerase
 	nrfjprog -f nrf52 --reset
+	@echo ============================================
+	@echo SoftDevice flash complete.
+	@echo ============================================
 
-erase:
+erase: check_device
+	@echo ============================================
+	@echo Erasing device...
 	nrfjprog -f nrf52 --eraseall
+	@echo ============================================
+	@echo Erase complete.
+	@echo ============================================
 
 SDK_CONFIG_FILE := ../config/sdk_config.h
 CMSIS_CONFIG_TOOL := $(SDK_ROOT)/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar
