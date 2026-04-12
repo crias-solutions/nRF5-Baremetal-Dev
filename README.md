@@ -3,7 +3,6 @@
 ![nRF52840](https://img.shields.io/badge/nRF52840-DK-blue)
 ![SoftDevice](https://img.shields.io/badge/SoftDevice-S140%20v7.2-green)
 ![SDK](https://img.shields.io/badge/SDK-nRF5%20SDK%2017.1.0-orange)
-![Toolchain](https://img.shields.io/badge/GCC-14.2-blue)
 ![License](https://img.shields.io/badge/License-Nordic%20BSD-yellow)
 
 Bare-metal Nordic nRF5 SDK project template with working LED Button Service example.
@@ -12,95 +11,47 @@ Bare-metal Nordic nRF5 SDK project template with working LED Button Service exam
 
 ## WHY
 
-This is a reusable template project for developing bare-metal applications on Nordic Semiconductor nRF5 devices. It provides a production-ready foundation without relying on Zephyr RTOS or nRF Connect SDK, using the standalone nRF5 SDK with pure GNU Make + GCC for full control over the build process and debugging experience.
+This template provides a production-ready foundation for bare-metal development on Nordic Semiconductor nRF5 devices. It uses the standalone nRF5 SDK with pure GNU Make + GCC, giving full control over the build process without Zephyr RTOS dependencies.
 
-The included LED Button Service demonstrates core BLE peripheral patterns: advertising, connections, characteristic reads/writes, and notifications. Use it as a reference or starting point for your own nRF5 bare-metal projects.
+The LED Button Service demonstrates core BLE peripheral patterns: advertising, connections, characteristic reads/writes, and notifications.
 
 ---
 
 ## HOW
 
+### Quick Start (Docker)
+
+```bash
+# Build firmware
+docker compose run build make -C pca10056/s140/armgcc
+
+# Run OpenCode
+docker compose run opencode
+```
+
 ### Architecture
 
 ```
 nrf5-baremetal-template/
-├── main.c                              # Application entry point (LED Button Service example)
-├── pca10056/                           # Board-specific configuration
-│   └── s140/
-│       ├── armgcc/
-│       │   ├── Makefile                # Build with GNU Make
-│       │   └── check_com_ports.ps1     # Pre-flash validation script
-│       └── config/
-│           └── sdk_config.h            # SDK module configuration
-├── .vscode/                            # VS Code development environment
-│   ├── launch.json                     # J-Link debugging with RTT
-│   ├── tasks.json                      # Build tasks
-│   └── settings.json                   # Toolchain paths
-├── AGENTS.md                           # Agent guidelines for AI assistants
-├── README.md                           # This file
-└── WRITING.md                          # README style guide
+├── main.c                              # Application entry (LED Button Service)
+├── pca10056/s140/armgcc/               # Board/SoftDevice config
+│   ├── Makefile                        # Build with GNU Make
+│   └── config/sdk_config.h             # SDK configuration
+├── Dockerfile                          # Docker build environment
+├── docker-compose.yml                  # Docker services
+├── DOCKER.md                           # Docker documentation
+├── AGENTS.md                           # Agent guidelines
+└── .vscode/                            # VS Code config (host development)
 ```
 
-### Using This Template
-
-This project is designed as a starting point for nRF5 bare-metal development. The LED Button Service application serves as a working example demonstrating:
-
-- BLE peripheral configuration
-- SoftDevice integration
-- Timer-based LED control
-- Button input handling
-- RTT logging
-
-To create a new project:
-1. Copy this template to a new directory
-2. Modify `main.c` with your application code
-3. Update board configuration if using different hardware
-4. Update `Makefile` and `README.md` with your project name
-ble_app_blinky/
-├── main.c                              # Application entry point
-├── pca10056/                           # Board-specific configuration
-│   └── s140/
-│       ├── armgcc/
-│       │   ├── Makefile                # Build with GNU Make
-│       │   └── check_com_ports.ps1     # Pre-flash validation script
-│       └── config/
-│           └── sdk_config.h            # SDK module configuration
-├── .vscode/                            # VS Code development environment
-│   ├── launch.json                     # J-Link debugging with RTT
-│   ├── tasks.json                      # Build tasks
-│   └── settings.json                   # Toolchain paths
-├── AGENTS.md                           # Agent guidelines for AI assistants
-├── README.md                           # This file
-└── WRITING.md                          # README style guide
-```
-
-### Key Technical Decisions
+### Key Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Standalone nRF5 SDK | No Zephyr dependency, full bare-metal control |
-| GNU Make + GCC | Open toolchain, portable, scriptable |
-| J-Link + Cortex-Debug | Native debugging with RTT output |
-| VS Code | Lightweight IDE, free, cross-platform |
-| Pre-flash validation | Validates J-Link, device, and COM ports before flash |
-
-### Pre-Flash Device Validation
-
-Before flashing, the build system validates:
-
-1. **J-Link connectivity** - Verifies debugger is detected
-2. **Device verification** - Confirms nRF52840_XXAA is connected
-3. **COM port enumeration** - Checks for 2 J-Link CDC ports (VID_1366)
-
-This prevents wasted time on failed flashes due to disconnected hardware.
-
-### Development Flow
-
-1. Edit `main.c` or `sdk_config.h`
-2. Build with `make` or `Ctrl+Shift+B`
-3. Validation runs automatically before flash
-4. Flash with `make flash`
-5. Debug with `F5` - RTT output in TERMINAL tab
+| Standalone nRF5 SDK | No Zephyr, full bare-metal control |
+| GNU Make + GCC | Open toolchain, portable |
+| Docker | Self-contained build environment |
+| J-Link + Cortex-Debug | Debugging with RTT output |
 
 ---
 
@@ -108,13 +59,11 @@ This prevents wasted time on failed flashes due to disconnected hardware.
 
 ### Core Features
 
-- BLE peripheral advertising with configurable interval
-- LED1 fast blinking during advertising (250ms interval)
-- LED2 constant ON when connected
-- LED3 toggled by local button press
-- LED3 controlled via BLE write from central device
-- SEGGER RTT logging for runtime diagnostics
-- Full interrupt-driven architecture
+- BLE peripheral advertising (device: "Nordic_Blinky")
+- LED1 fast blink (250ms) during advertising
+- LED2 ON when connected
+- LED3 toggles via button or BLE write
+- SEGGER RTT logging for diagnostics
 
 ### Three Key Components
 
@@ -122,7 +71,7 @@ This prevents wasted time on failed flashes due to disconnected hardware.
 2. **Application** - LED Button Service implements peripheral logic
 3. **Drivers** - nrfx drivers for GPIO, timers, peripherals
 
-### LED Behavior Summary
+### LED Behavior
 
 | State | LED1 (Advertising) | LED2 (Connected) | LED3 (LEDBUTTON) |
 |-------|-------------------|------------------|------------------|
@@ -132,177 +81,69 @@ This prevents wasted time on failed flashes due to disconnected hardware.
 
 ### Deliverables
 
-- Compiled `.hex` and `.bin` firmware files
-- Debug symbols for J-Link/GDB
-- SVD file for peripheral register view
-- Pre-flash validation script
+- `.hex` - Flash programming
+- `.bin` - Raw binary
+- `.out` - ELF with debug symbols
 
 ---
 
 ## Installation
 
-### Prerequisites
+### Option 1: Docker (Recommended)
 
-| Tool | Version | Location |
-|------|---------|----------|
-| Arm GNU Toolchain | 14.2 | `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1` |
-| J-Link Software | V9+ | `C:\Program Files\SEGGER\JLink_V924a` |
-| nrfjprog | Latest | Part of nRF Command Line Tools |
-| Java | JDK 17+ | Required for CMSIS Configuration Wizard |
-| VS Code | Latest | Recommended for development |
+```bash
+# Build the container
+docker compose build
 
-### Setup Steps
+# Build firmware
+docker compose run build make -C pca10056/s140/armgcc
+```
 
-1. **Clone or copy this project**
+Output: `pca10056/s140/armgcc/_build/nrf52840_xxaa.hex`
 
-2. **Install Arm GNU Toolchain**
-   - Download from: https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
-   - Install to default location or note path for settings
+### Option 2: Local Development
 
-3. **Install J-Link**
-   - Download from: https://www.segger.com/downloads/jlink/
-   - Install with default options
+| Tool | Version |
+|------|---------|
+| Arm GNU Toolchain | 10.3+ |
+| nrfjprog | 10.15+ |
+| Java | JDK 17+ |
 
-4. **Install nRF Command Line Tools**
-   - Download from: https://www.nordicsemi.com/Products/Development-tools/nrf-command-line-tools
-   - Ensures `nrfjprog` is available in PATH
+Set `SDK_ROOT` to your nRF5 SDK path:
 
-5. **Install Java** (for SDK Configuration Wizard)
-   - Download Temurin JDK from: https://adoptium.net/
-   - Add to PATH: `C:\Program Files\Eclipse Adoptium\jdk-*\bin`
-
-6. **Install VS Code Extensions**
-   - **Cortex-Debug** by marus25
-
-7. **Recover the device** (one-time, for boards previously used with nRF Connect SDK)
-   ```bash
-   nrfjprog --recover
-   ```
-
-8. **Flash SoftDevice** (one-time)
-   ```bash
-   make -C pca10056/s140/armgcc flash_softdevice
-   ```
+```bash
+export SDK_ROOT=/path/to/nRF5_SDK_17.1.0_ddde560
+make -C pca10056/s140/armgcc
+```
 
 ---
 
 ## Usage
 
-### First Boot
-
-1. Connect nRF52840 DK via USB
-2. Flash firmware: `make -C pca10056/s140/armgcc flash`
-3. LED1 should start blinking fast (250ms)
-4. Device advertises as **"Nordic_Blinky"**
-
-### Build
+### Flash Firmware
 
 ```bash
-# From project root
-make -C pca10056/s140/armgcc
+# Docker (requires --privileged + USB)
+docker compose run --privileged build make -C pca10056/s140/armgcc flash
 
-# Or in VS Code
-Ctrl+Shift+B
-```
-
-### Flash
-
-```bash
+# Host
 make -C pca10056/s140/armgcc flash
 ```
 
-Pre-flash validation runs automatically. Aborts if:
-- J-Link not detected
-- Wrong device (not nRF52840)
-- Missing COM ports
+### Flash SoftDevice (one-time)
 
-### Debug
+```bash
+make -C pca10056/s140/armgcc flash_softdevice
+```
+
+### First Boot
 
 1. Connect nRF52840 DK via USB
-2. Press `F5` in VS Code
-3. Debugger stops at `main()`
-4. RTT output appears in TERMINAL tab
-
-### SDK Configuration
-
-Modify peripheral and module settings:
-
-```bash
-# F1 -> Tasks: Run Task -> SDK Config
-```
-
-Or edit `pca10056/s140/config/sdk_config.h` directly.
-
-### Device Validation Only
-
-```bash
-make -C pca10056/s140/armgcc check_device
-```
-
-### Clean
-
-```bash
-make -C pca10056/s140/armgcc clean
-```
-
----
-
-## Testing
-
-This is bare-metal firmware. Testing requires hardware:
-
-### Functional Test
-
-1. Flash firmware to nRF52840 DK
-2. Observe LED1 blinking fast (250ms interval)
-3. Connect from nRF Connect app (device name: "Nordic_Blinky")
-4. LED1 stops, LED2 turns ON
-5. Press Button 1 - LED3 toggles
-6. Use app to write LED3 ON/OFF - LED3 responds
-7. Disconnect - LED1 resumes blinking
-
-### Debug Test
-
-1. Set breakpoint in `ble_evt_handler`
-2. Trigger BLE connection
-3. Inspect BLE event structure
-
-### RTT Test
-
-1. Press F5 to start debug session
-2. Open TERMINAL tab in VS Code
-3. Verify log output appears:
-   - `Started advertising`
-   - `Connected` / `Disconnected`
-   - `Button pressed!` / `LED3 ON` / `LED3 OFF`
-
----
-
-## Configuration
-
-### Toolchain Paths
-
-Edit `.vscode/settings.json`:
-
-```json
-{
-    "cortex-debug.armToolchainPath": "C:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/14.2 rel1/bin",
-    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink_V924a/JLinkGDBServer.exe"
-}
-```
-
-### Device Target
-
-Current target: **nRF52840_XXAA** on **PCA10056** (nRF52840 Development Kit)
-
-### Build Output
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `.out` | `_build/nrf52840_xxaa.out` | ELF with debug symbols |
-| `.hex` | `_build/nrf52840_xxaa.hex` | Flash programming |
-| `.bin` | `_build/nrf52840_xxaa.bin` | Raw binary |
-| `.map` | `_build/nrf52840_xxaa.map` | Linker map file |
+2. Flash firmware
+3. LED1 blinks fast (250ms) - device advertising
+4. Connect from nRF Connect app ("Nordic_Blinky")
+5. LED1 stops, LED2 turns ON
+6. Press Button 1 - LED3 toggles
 
 ---
 
@@ -312,7 +153,7 @@ This project uses Nordic Semiconductor's BSD 3-Clause License.
 
 SPDX-License-Identifier: BSD-3-Clause
 
-Redistribution and use in source and binary forms are permitted provided that the above copyright notice and this list of conditions are met. See LICENSE file for full text.
+See LICENSE file for full text.
 
 ---
 
@@ -321,5 +162,3 @@ Redistribution and use in source and binary forms are permitted provided that th
 - [nRF5 SDK Documentation](https://infocenter.nordicsemi.com/topic/sdk_nrf5_v17.1.0/home.html)
 - [S140 SoftDevice Specification](https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.softdevices52.s140/dita/softdevices/s140/intro.html)
 - [nRF52840 Product Specification](https://infocenter.nordicsemi.com/topic/ps_nrf52840/modules.html)
-- [Cortex-Debug Extension](https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug)
-- [SEGGER J-Link](https://www.segger.com/downloads/jlink/)

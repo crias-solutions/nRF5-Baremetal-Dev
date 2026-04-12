@@ -1,0 +1,21 @@
+# Build artifacts
+pca10056/s140/armgcc/_build/
+*.out
+*.hex
+*.bin
+*.map
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

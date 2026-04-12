@@ -1,0 +1,16 @@
+services:
+  build:
+    build: .
+    volumes:
+      - .:/workspace
+    environment:
+      - SDK_ROOT=/opt/nRF5_SDK_17.1.0_ddde560
+
+  opencode:
+    build: .
+    volumes:
+      - .:/workspace
+    environment:
+      - SDK_ROOT=/opt/nRF5_SDK_17.1.0_ddde560
+    stdin_open: true
+    tty: true

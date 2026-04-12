@@ -2,7 +2,7 @@ PROJECT_NAME     := nrf5_baremetal_template_pca10056_s140
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := _build
 
-SDK_ROOT := C:/nordic/Donwloads/nRF5_SDK_17.1.0_ddde560
+SDK_ROOT ?= /opt/nrf-sdk
 PROJ_DIR := ../../..
 
 $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \
