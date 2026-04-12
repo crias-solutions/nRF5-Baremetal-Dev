@@ -1,8 +1,8 @@
-# Agent Guidelines for ble_app_blinky
+# Agent Guidelines for nrf5-baremetal-template
 
 ## Project Overview
 
-Nordic Semiconductor nRF5 SDK bare-metal BLE application (LED Button Service) on nRF52840.
+Nordic Semiconductor nRF5 SDK bare-metal project template with LED Button Service example on nRF52840.
 
 - **SDK**: Nordic nRF5 SDK 17.1.0 (standalone, non-Zephyr)
 - **Target**: nRF52840_XXAA (Cortex-M4 with FPU)
@@ -131,8 +131,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 ## Project Structure
 
 ```
-ble_app_blinky/
-├── main.c                          # Application entry point
+nrf5-baremetal-template/
+├── main.c                          # Application entry point (LED Button Service example)
 ├── pca10056/s140/armgcc/Makefile   # Build config
 ├── pca10056/s140/config/sdk_config.h  # SDK configuration
 └── .vscode/                        # VS Code config

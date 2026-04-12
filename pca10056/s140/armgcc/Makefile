@@ -1,4 +1,4 @@
-PROJECT_NAME     := ble_app_blinky_pca10056_s140
+PROJECT_NAME     := nrf5_baremetal_template_pca10056_s140
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := _build
 

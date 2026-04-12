@@ -1,4 +1,4 @@
-# BLE Blinky
+# nRF5 Bare-metal Template
 
 ![nRF52840](https://img.shields.io/badge/nRF52840-DK-blue)
 ![SoftDevice](https://img.shields.io/badge/SoftDevice-S140%20v7.2-green)
@@ -6,15 +6,15 @@
 ![Toolchain](https://img.shields.io/badge/GCC-14.2-blue)
 ![License](https://img.shields.io/badge/License-Nordic%20BSD-yellow)
 
-Bare-metal BLE development project for Nordic Semiconductor nRF52840 using the LED Button Service.
+Bare-metal Nordic nRF5 SDK project template with working LED Button Service example.
 
 ---
 
 ## WHY
 
-This project provides a minimal, production-ready foundation for developing Bluetooth Low Energy applications on Nordic Semiconductor nRF52840 hardware without relying on Zephyr RTOS or nRF Connect SDK. It uses the standalone nRF5 SDK with pure GNU Make + GCC for full control over the build process and debugging experience.
+This is a reusable template project for developing bare-metal applications on Nordic Semiconductor nRF5 devices. It provides a production-ready foundation without relying on Zephyr RTOS or nRF Connect SDK, using the standalone nRF5 SDK with pure GNU Make + GCC for full control over the build process and debugging experience.
 
-The LED Button Service demonstrates core BLE peripheral patterns: advertising, connections, characteristic reads/writes, and notifications.
+The included LED Button Service demonstrates core BLE peripheral patterns: advertising, connections, characteristic reads/writes, and notifications. Use it as a reference or starting point for your own nRF5 bare-metal projects.
 
 ---
 
@@ -23,6 +23,39 @@ The LED Button Service demonstrates core BLE peripheral patterns: advertising, c
 ### Architecture
 
 ```
+nrf5-baremetal-template/
+├── main.c                              # Application entry point (LED Button Service example)
+├── pca10056/                           # Board-specific configuration
+│   └── s140/
+│       ├── armgcc/
+│       │   ├── Makefile                # Build with GNU Make
+│       │   └── check_com_ports.ps1     # Pre-flash validation script
+│       └── config/
+│           └── sdk_config.h            # SDK module configuration
+├── .vscode/                            # VS Code development environment
+│   ├── launch.json                     # J-Link debugging with RTT
+│   ├── tasks.json                      # Build tasks
+│   └── settings.json                   # Toolchain paths
+├── AGENTS.md                           # Agent guidelines for AI assistants
+├── README.md                           # This file
+└── WRITING.md                          # README style guide
+```
+
+### Using This Template
+
+This project is designed as a starting point for nRF5 bare-metal development. The LED Button Service application serves as a working example demonstrating:
+
+- BLE peripheral configuration
+- SoftDevice integration
+- Timer-based LED control
+- Button input handling
+- RTT logging
+
+To create a new project:
+1. Copy this template to a new directory
+2. Modify `main.c` with your application code
+3. Update board configuration if using different hardware
+4. Update `Makefile` and `README.md` with your project name
 ble_app_blinky/
 ├── main.c                              # Application entry point
 ├── pca10056/                           # Board-specific configuration
