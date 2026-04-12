@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "make",
+            "args": [],
+            "options": { "cwd": "${workspaceFolder}/pca10056/s140/armgcc" },
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "make",
+            "args": ["clean"],
+            "options": { "cwd": "${workspaceFolder}/pca10056/s140/armgcc" },
+            "problemMatcher": []
+        },
+        {
+            "label": "SDK Config",
+            "type": "shell",
+            "command": "cmd",
+            "args": ["/c", "\"C:/Program Files/Eclipse Adoptium/jdk-25.0.2.10-hotspot/bin/java.exe\" -jar \"C:/nordic/Donwloads/nRF5_SDK_17.1.0_ddde560/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar\" \"${workspaceFolder}/pca10056/s140/config/sdk_config.h\""],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Flash SoftDevice",
+            "type": "shell",
+            "command": "make",
+            "args": ["flash_softdevice"],
+            "options": { "cwd": "${workspaceFolder}/pca10056/s140/armgcc" },
+            "problemMatcher": []
+        }
+    ]
+}
