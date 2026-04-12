@@ -24,17 +24,21 @@ The LED Button Service demonstrates core BLE peripheral patterns: advertising, c
 
 ```
 ble_app_blinky/
-├── main.c                          # Application entry point
-├── pca10056/                       # Board-specific configuration
+├── main.c                              # Application entry point
+├── pca10056/                           # Board-specific configuration
 │   └── s140/
 │       ├── armgcc/
-│       │   └── Makefile            # Build with GNU Make
+│       │   ├── Makefile                # Build with GNU Make
+│       │   └── check_com_ports.ps1     # Pre-flash validation script
 │       └── config/
-│           └── sdk_config.h        # SDK module configuration
-└── .vscode/                        # VS Code development environment
-    ├── launch.json                  # J-Link debugging with RTT
-    ├── tasks.json                   # Build tasks
-    └── settings.json                # Toolchain paths
+│           └── sdk_config.h            # SDK module configuration
+├── .vscode/                            # VS Code development environment
+│   ├── launch.json                     # J-Link debugging with RTT
+│   ├── tasks.json                      # Build tasks
+│   └── settings.json                   # Toolchain paths
+├── AGENTS.md                           # Agent guidelines for AI assistants
+├── README.md                           # This file
+└── WRITING.md                          # README style guide
 ```
 
 ### Key Technical Decisions
@@ -45,13 +49,25 @@ ble_app_blinky/
 | GNU Make + GCC | Open toolchain, portable, scriptable |
 | J-Link + Cortex-Debug | Native debugging with RTT output |
 | VS Code | Lightweight IDE, free, cross-platform |
+| Pre-flash validation | Validates J-Link, device, and COM ports before flash |
+
+### Pre-Flash Device Validation
+
+Before flashing, the build system validates:
+
+1. **J-Link connectivity** - Verifies debugger is detected
+2. **Device verification** - Confirms nRF52840_XXAA is connected
+3. **COM port enumeration** - Checks for 2 J-Link CDC ports (VID_1366)
+
+This prevents wasted time on failed flashes due to disconnected hardware.
 
 ### Development Flow
 
 1. Edit `main.c` or `sdk_config.h`
-2. Build with `Ctrl+Shift+B` or `make`
-3. Flash with `make flash` or VS Code task
-4. Debug with `F5` - RTT output in TERMINAL tab
+2. Build with `make` or `Ctrl+Shift+B`
+3. Validation runs automatically before flash
+4. Flash with `make flash`
+5. Debug with `F5` - RTT output in TERMINAL tab
 
 ---
 
@@ -59,10 +75,11 @@ ble_app_blinky/
 
 ### Core Features
 
-- BLE peripheral advertising and connection handling
-- LED Button Service (Nordic proprietary service)
-- Button press triggers BLE notification to central device
-- LED control via BLE write from central device
+- BLE peripheral advertising with configurable interval
+- LED1 fast blinking during advertising (250ms interval)
+- LED2 constant ON when connected
+- LED3 toggled by local button press
+- LED3 controlled via BLE write from central device
 - SEGGER RTT logging for runtime diagnostics
 - Full interrupt-driven architecture
 
@@ -72,11 +89,20 @@ ble_app_blinky/
 2. **Application** - LED Button Service implements peripheral logic
 3. **Drivers** - nrfx drivers for GPIO, timers, peripherals
 
+### LED Behavior Summary
+
+| State | LED1 (Advertising) | LED2 (Connected) | LED3 (LEDBUTTON) |
+|-------|-------------------|------------------|------------------|
+| Advertising | **Fast blink (250ms)** | OFF | Last state |
+| Connected | OFF | **ON** | Button toggles |
+| Disconnected | **Fast blink** | OFF | Last state |
+
 ### Deliverables
 
 - Compiled `.hex` and `.bin` firmware files
 - Debug symbols for J-Link/GDB
 - SVD file for peripheral register view
+- Pre-flash validation script
 
 ---
 
@@ -115,7 +141,12 @@ ble_app_blinky/
 6. **Install VS Code Extensions**
    - **Cortex-Debug** by marus25
 
-7. **Flash SoftDevice** (one-time)
+7. **Recover the device** (one-time, for boards previously used with nRF Connect SDK)
+   ```bash
+   nrfjprog --recover
+   ```
+
+8. **Flash SoftDevice** (one-time)
    ```bash
    make -C pca10056/s140/armgcc flash_softdevice
    ```
@@ -123,6 +154,13 @@ ble_app_blinky/
 ---
 
 ## Usage
+
+### First Boot
+
+1. Connect nRF52840 DK via USB
+2. Flash firmware: `make -C pca10056/s140/armgcc flash`
+3. LED1 should start blinking fast (250ms)
+4. Device advertises as **"Nordic_Blinky"**
 
 ### Build
 
@@ -139,6 +177,11 @@ Ctrl+Shift+B
 ```bash
 make -C pca10056/s140/armgcc flash
 ```
+
+Pre-flash validation runs automatically. Aborts if:
+- J-Link not detected
+- Wrong device (not nRF52840)
+- Missing COM ports
 
 ### Debug
 
@@ -157,11 +200,48 @@ Modify peripheral and module settings:
 
 Or edit `pca10056/s140/config/sdk_config.h` directly.
 
+### Device Validation Only
+
+```bash
+make -C pca10056/s140/armgcc check_device
+```
+
 ### Clean
 
 ```bash
 make -C pca10056/s140/armgcc clean
 ```
+
+---
+
+## Testing
+
+This is bare-metal firmware. Testing requires hardware:
+
+### Functional Test
+
+1. Flash firmware to nRF52840 DK
+2. Observe LED1 blinking fast (250ms interval)
+3. Connect from nRF Connect app (device name: "Nordic_Blinky")
+4. LED1 stops, LED2 turns ON
+5. Press Button 1 - LED3 toggles
+6. Use app to write LED3 ON/OFF - LED3 responds
+7. Disconnect - LED1 resumes blinking
+
+### Debug Test
+
+1. Set breakpoint in `ble_evt_handler`
+2. Trigger BLE connection
+3. Inspect BLE event structure
+
+### RTT Test
+
+1. Press F5 to start debug session
+2. Open TERMINAL tab in VS Code
+3. Verify log output appears:
+   - `Started advertising`
+   - `Connected` / `Disconnected`
+   - `Button pressed!` / `LED3 ON` / `LED3 OFF`
 
 ---
 
@@ -182,10 +262,6 @@ Edit `.vscode/settings.json`:
 
 Current target: **nRF52840_XXAA** on **PCA10056** (nRF52840 Development Kit)
 
-To change targets, modify `pca10056/s140/armgcc/Makefile`:
-- `TARGETS`: Change to desired build target
-- `CFLAGS`: Update `-D` defines for device
-
 ### Build Output
 
 | File | Location | Purpose |
@@ -194,28 +270,6 @@ To change targets, modify `pca10056/s140/armgcc/Makefile`:
 | `.hex` | `_build/nrf52840_xxaa.hex` | Flash programming |
 | `.bin` | `_build/nrf52840_xxaa.bin` | Raw binary |
 | `.map` | `_build/nrf52840_xxaa.map` | Linker map file |
-
----
-
-## Testing
-
-This is bare-metal firmware. Testing requires hardware:
-
-1. **Functional Test**
-   - Flash firmware to nRF52840 DK
-   - Observe LED patterns
-   - Connect from nRF Connect app or similar BLE central
-   - Send LED on/off commands
-   - Press button, verify notification received
-
-2. **Debug Test**
-   - Set breakpoint in `ble_evt_handler`
-   - Trigger BLE connection
-   - Inspect BLE event structure
-
-3. **RTT Test**
-   - Open TERMINAL tab in VS Code during debug
-   - Verify log output appears
 
 ---
 

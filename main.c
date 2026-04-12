@@ -44,6 +44,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include "nordic_common.h"
 #include "nrf.h"
@@ -69,12 +70,14 @@
 #include "nrf_log_default_backends.h"
 
 
-#define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
+#define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Blinks when device is advertising. */
 #define CONNECTED_LED                   BSP_BOARD_LED_1                         /**< Is on when device has connected. */
 #define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
 #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
 #define DEVICE_NAME                     "Nordic_Blinky"                         /**< Name of device. Will be included in the advertising data. */
+
+#define LED_BLINK_INTERVAL              APP_TIMER_TICKS(250)                    /**< Fast blink rate for advertising LED (250ms). */
 
 #define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
@@ -100,8 +103,10 @@
 BLE_LBS_DEF(m_lbs);                                                             /**< LED Button Service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
+APP_TIMER_DEF(m_led_blink_timer);                                               /**< Timer for LED1 blink. */
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
+static bool m_led_state = false;                                                /**< Current state of LED3 (LEDBUTTON_LED). */
 
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
@@ -150,6 +155,30 @@ static void leds_init(void)
 }
 
 
+/**@brief Function for handling the LED blink timer timeout.
+ *
+ * @param[in] p_context  Unused parameter.
+ */
+static void led_blink_timer_handler(void * p_context)
+{
+    UNUSED_PARAMETER(p_context);
+    bsp_board_led_invert(ADVERTISING_LED);
+}
+
+
+/**@brief Function for the LED blink timer initialization.
+ *
+ * @details Creates a timer for blinking LED1 during advertising.
+ */
+static void led_blink_timer_init(void)
+{
+    ret_code_t err_code = app_timer_create(&m_led_blink_timer,
+                                          APP_TIMER_MODE_REPEATED,
+                                          led_blink_timer_handler);
+    APP_ERROR_CHECK(err_code);
+}
+
+
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module.
@@ -159,6 +188,9 @@ static void timers_init(void)
     // Initialize timer module, making it use the scheduler
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
+
+    // Initialize LED blink timer
+    led_blink_timer_init();
 }
 
 
@@ -269,15 +301,16 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
  */
 static void led_write_handler(uint16_t conn_handle, ble_lbs_t * p_lbs, uint8_t led_state)
 {
-    if (led_state)
+    m_led_state = (led_state != 0);
+    if (m_led_state)
     {
         bsp_board_led_on(LEDBUTTON_LED);
-        NRF_LOG_INFO("Received LED ON!");
+        NRF_LOG_INFO("BLE: LED3 ON");
     }
     else
     {
         bsp_board_led_off(LEDBUTTON_LED);
-        NRF_LOG_INFO("Received LED OFF!");
+        NRF_LOG_INFO("BLE: LED3 OFF");
     }
 }
 
@@ -369,7 +402,8 @@ static void advertising_start(void)
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     APP_ERROR_CHECK(err_code);
 
-    bsp_board_led_on(ADVERTISING_LED);
+    NRF_LOG_INFO("Started advertising");
+    app_timer_start(m_led_blink_timer, LED_BLINK_INTERVAL, NULL);
 }
 
 
@@ -386,8 +420,9 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Connected");
-            bsp_board_led_on(CONNECTED_LED);
+            app_timer_stop(m_led_blink_timer);
             bsp_board_led_off(ADVERTISING_LED);
+            bsp_board_led_on(CONNECTED_LED);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
             err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
             APP_ERROR_CHECK(err_code);
@@ -396,7 +431,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_INFO("Disconnected");
+            NRF_LOG_INFO("Disconnected. Restarting advertising...");
             bsp_board_led_off(CONNECTED_LED);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             err_code = app_button_disable();
@@ -489,10 +524,25 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_action)
 {
     ret_code_t err_code;
 
+    NRF_LOG_INFO("Button handler called: pin=%d, action=%d", pin_no, button_action);
+
     switch (pin_no)
     {
         case LEDBUTTON_BUTTON:
-            NRF_LOG_INFO("Send button state change.");
+            NRF_LOG_INFO("Button pressed!");
+            // Toggle LED3 locally
+            m_led_state = !m_led_state;
+            if (m_led_state)
+            {
+                bsp_board_led_on(LEDBUTTON_LED);
+                NRF_LOG_INFO("LED3 ON");
+            }
+            else
+            {
+                bsp_board_led_off(LEDBUTTON_LED);
+                NRF_LOG_INFO("LED3 OFF");
+            }
+            // Send notification to BLE central if connected
             err_code = ble_lbs_on_button_change(m_conn_handle, &m_lbs, button_action);
             if (err_code != NRF_SUCCESS &&
                 err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
@@ -504,6 +554,7 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_action)
             break;
 
         default:
+            NRF_LOG_INFO("Unknown button: pin=%d", pin_no);
             APP_ERROR_HANDLER(pin_no);
             break;
     }
@@ -519,7 +570,7 @@ static void buttons_init(void)
     //The array must be static because a pointer to it will be saved in the button handler module.
     static app_button_cfg_t buttons[] =
     {
-        {LEDBUTTON_BUTTON, false, BUTTON_PULL, button_event_handler}
+        {LEDBUTTON_BUTTON, APP_BUTTON_ACTIVE_LOW, BUTTON_PULL, button_event_handler}
     };
 
     err_code = app_button_init(buttons, ARRAY_SIZE(buttons),
