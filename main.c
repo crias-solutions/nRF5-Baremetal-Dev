@@ -69,12 +69,13 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#define ADVERTISING_LED BSP_BOARD_LED_0 /**< Blinks when device is advertising. */
-#define CONNECTED_LED BSP_BOARD_LED_1   /**< Is on when device has connected. */
-#define LEDBUTTON_LED BSP_BOARD_LED_2   /**< LED to be toggled with the help of the LED Button Service. */
+#define ADVERTISING_LED BSP_BOARD_LED_0 /**< LED1 - Sequence LED. */
+#define CONNECTED_LED BSP_BOARD_LED_1   /**< LED2 - Sequence LED. */
+#define LEDBUTTON_LED BSP_BOARD_LED_2   /**< LED3 - Sequence LED. */
+#define SEQUENCE_LED BSP_BOARD_LED_3    /**< LED4 - Sequence LED. */
 #define LEDBUTTON_BUTTON BSP_BUTTON_0   /**< Button that will trigger the notification event with the LED Button Service */
 
-#define DEVICE_NAME "CRIAS_Test" /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME "CRIAS_Test2" /**< Name of device. Will be included in the advertising data. */
 
 #define LED_BLINK_INTERVAL APP_TIMER_TICKS(250) /**< Fast blink rate for advertising LED (250ms). */
 
@@ -104,6 +105,8 @@ APP_TIMER_DEF(m_led_blink_timer); /**< Timer for LED1 blink. */
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID; /**< Handle of the current connection. */
 static bool m_led_state = false;                         /**< Current state of LED3 (LEDBUTTON_LED). */
+static uint8_t m_sequence_index = 0;               /**< Current LED index in sequence (0-3). */
+static bool m_sequence_reverse = false;            /**< false = forward (1→4), true = reverse (4→1). */
 
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;           /**< Advertising handle used to identify an advertising set. */
 static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];            /**< Buffer for storing an encoded advertising set. */
@@ -148,6 +151,11 @@ static void leds_init(void)
     bsp_board_init(BSP_INIT_LEDS);
 }
 
+/**@brief Array of LEDs for sequential blinking. */
+static const uint8_t m_sequence_leds[] = {
+    ADVERTISING_LED, CONNECTED_LED, LEDBUTTON_LED, SEQUENCE_LED
+};
+
 /**@brief Function for handling the LED blink timer timeout.
  *
  * @param[in] p_context  Unused parameter.
@@ -155,7 +163,22 @@ static void leds_init(void)
 static void led_blink_timer_handler(void *p_context)
 {
     UNUSED_PARAMETER(p_context);
-    bsp_board_led_invert(ADVERTISING_LED);
+
+    bsp_board_led_off(m_sequence_leds[m_sequence_index]);
+
+    if (m_sequence_reverse)
+    {
+        if (m_sequence_index == 0)
+            m_sequence_index = 3;
+        else
+            m_sequence_index--;
+    }
+    else
+    {
+        m_sequence_index = (m_sequence_index + 1) % 4;
+    }
+
+    bsp_board_led_on(m_sequence_leds[m_sequence_index]);
 }
 
 /**@brief Function for the LED blink timer initialization.
@@ -379,6 +402,15 @@ static void advertising_start(void)
 {
     ret_code_t err_code;
 
+    m_sequence_reverse = false;
+    m_sequence_index = 0;
+
+    for (int i = 0; i < 4; i++)
+    {
+        bsp_board_led_off(m_sequence_leds[i]);
+    }
+    bsp_board_led_on(m_sequence_leds[m_sequence_index]);
+
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     APP_ERROR_CHECK(err_code);
 
@@ -399,19 +431,26 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
     {
     case BLE_GAP_EVT_CONNECTED:
         NRF_LOG_INFO("Connected");
-        app_timer_stop(m_led_blink_timer);
-        bsp_board_led_off(ADVERTISING_LED);
-        bsp_board_led_on(CONNECTED_LED);
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
         APP_ERROR_CHECK(err_code);
         err_code = app_button_enable();
         APP_ERROR_CHECK(err_code);
+        if (!m_sequence_reverse)
+        {
+            NRF_LOG_INFO("Reverse sequence");
+            m_sequence_reverse = true;
+            m_sequence_index = 3;
+            for (int i = 0; i < 4; i++)
+            {
+                bsp_board_led_off(m_sequence_leds[i]);
+            }
+            bsp_board_led_on(m_sequence_leds[m_sequence_index]);
+        }
         break;
 
     case BLE_GAP_EVT_DISCONNECTED:
         NRF_LOG_INFO("Disconnected. Restarting advertising...");
-        bsp_board_led_off(CONNECTED_LED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         err_code = app_button_disable();
         APP_ERROR_CHECK(err_code);
@@ -419,12 +458,41 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         break;
 
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-        // Pairing not supported
+    {
+        ble_gap_sec_params_t sec_params = {0};
+        sec_params.bond = 1;
+        sec_params.io_caps = BLE_GAP_IO_CAPS_NONE;
+        sec_params.oob = 0;
+        sec_params.min_key_size = 7;
+        sec_params.max_key_size = 16;
         err_code = sd_ble_gap_sec_params_reply(m_conn_handle,
-                                               BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP,
-                                               NULL,
+                                               BLE_GAP_SEC_STATUS_SUCCESS,
+                                               &sec_params,
                                                NULL);
         APP_ERROR_CHECK(err_code);
+    }
+    break;
+
+    case BLE_GAP_EVT_AUTH_STATUS:
+    case BLE_GAP_EVT_CONN_SEC_UPDATE:
+        if (p_ble_evt->header.evt_id == BLE_GAP_EVT_AUTH_STATUS)
+        {
+            if (p_ble_evt->evt.gap_evt.params.auth_status.auth_status != BLE_GAP_SEC_STATUS_SUCCESS)
+            {
+                break;
+            }
+        }
+        if (!m_sequence_reverse)
+        {
+            NRF_LOG_INFO("Pairing complete - reverse sequence");
+            m_sequence_reverse = true;
+            m_sequence_index = 3;
+            for (int i = 0; i < 4; i++)
+            {
+                bsp_board_led_off(m_sequence_leds[i]);
+            }
+            bsp_board_led_on(m_sequence_leds[m_sequence_index]);
+        }
         break;
 
     case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
@@ -602,6 +670,7 @@ int main(void)
 
     // Start execution.
     NRF_LOG_INFO("Blinky example started.");
+    bsp_board_led_on(ADVERTISING_LED);
     advertising_start();
 
     // Enter main loop.
